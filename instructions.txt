@@ -1,0 +1,7 @@
+Cosas que recuerdo 	que he hecho para que funcione
+
+Añadir los directorios Include
+Habilitar EXTI1 interrupt
+Añadir FreeRTOS CMSIS2
+Cambiar SysTick a TIM6
+
