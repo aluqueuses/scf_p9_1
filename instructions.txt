@@ -5,3 +5,7 @@ Habilitar EXTI1 interrupt
 Añadir FreeRTOS CMSIS2
 Cambiar SysTick a TIM6
 
+Si se ha clonado el repositorio de github hay que linkar varios ficheros: 
+Core/Src/WiFi/{es_wifi_io.c,es_wifi.c,wifi.c} a /STM32Cube_FW_L4_V1.16.0/Projects/B-L475E-IOT01A/Applications/WiFi/Common/Src/*
+Drivers/BSP/B-L475E-IOT01/{stm34l475e_iot01_tsensor.c,stm32l475e_iot01.c} a Drivers/BSP/...
+Drivers/BSP/hts221.c a Drivers/BSP/...

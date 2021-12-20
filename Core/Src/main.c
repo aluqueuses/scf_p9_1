@@ -134,6 +134,7 @@ static  int wifi_server(void);
 static  int wifi_start(void);
 static  int wifi_connect(void);
 static  bool WebServerProcess(void);
+int wifi_get_http(void);
 
 /* USER CODE END PFP */
 
@@ -825,6 +826,43 @@ int wifi_connect(void)
   return 0;
 }
 
+int wifi_get_http(void)
+{
+	int ret,datasent;
+	uint8_t HTTP_REQUEST[]="GET / HTTP/1.0";
+	uint8_t ipaddr[4]={193,147,161,245};
+	uint8_t recvdata[1024];
+	int recvlen;
+#define HTTP_PORT 80
+
+	if (wifi_connect()!=0) return -1;
+
+	LOG(("Running HTTP GET test\n"));
+
+	//LOG(("My IP address is %d.%d.%d.%d\n",IP_Addr[0],IP_Addr[1],IP_Addr[2],IP_Addr[3]));
+
+	ret=WIFI_OpenClientConnection(SOCKET, WIFI_TCP_PROTOCOL, "http", ipaddr, HTTP_PORT, 1080);
+	if(ret!=WIFI_STATUS_OK) {
+		LOG(("Error in opening connection: %d\n",ret));
+	}
+
+	ret=WIFI_SendData(SOCKET, (uint8_t *)HTTP_REQUEST, strlen((char *)HTTP_REQUEST), &datasent, WIFI_WRITE_TIMEOUT);
+	if(ret!=WIFI_STATUS_OK) {
+		LOG(("Error in sending data: %d\n",ret));
+	}
+
+	ret=WIFI_ReceiveData(SOCKET, recvdata, 1000, &recvlen, 1000);
+	if(ret!=WIFI_STATUS_OK) {
+		LOG(("Error in receiving data: %d\n",ret));
+	} else {
+		LOG(("Received data: %s\n",recvdata));
+	}
+
+
+	return 0;
+
+}
+
 int wifi_server(void)
 {
   bool StopServer = false;
@@ -1076,7 +1114,7 @@ void StartDefaultTask(void *argument)
 void wifiStartTask(void *argument)
 {
   /* USER CODE BEGIN wifiStartTask */
-  wifi_server();
+  wifi_get_http();
 
 	/* Infinite loop */
   for(;;)
@@ -1139,4 +1177,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
