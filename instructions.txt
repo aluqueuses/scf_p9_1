@@ -13,3 +13,4 @@ Drivers/BSP/hts221.c a Drivers/BSP/...
 En CubeMX especificar que se usa el firmware V1.17.0 (no el 1.17.1)
 
 incrementar los stack size a 512 y el heap size a 5000
+configurar Newlib como reentrante en FreeRTOS
