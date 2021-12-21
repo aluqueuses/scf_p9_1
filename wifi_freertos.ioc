@@ -1,7 +1,9 @@
 #MicroXplorer Configuration settings - do not modify
-FREERTOS.FootprintOK=true
-FREERTOS.IPParameters=Tasks01,FootprintOK
-FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;wifiStart,24,128,wifiStartTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.FootprintOK=false
+FREERTOS.IPParameters=Tasks01,FootprintOK,configUSE_NEWLIB_REENTRANT,configTOTAL_HEAP_SIZE
+FREERTOS.Tasks01=defaultTask,16,512,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;wifiStart,24,512,wifiStartTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.configTOTAL_HEAP_SIZE=5000
+FREERTOS.configUSE_NEWLIB_REENTRANT=1
 File.Version=6
 GPIO.groupedBy=Group By Peripherals
 KeepUserPlacement=false

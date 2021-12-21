@@ -82,14 +82,14 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for wifiStart */
 osThreadId_t wifiStartHandle;
 const osThreadAttr_t wifiStart_attributes = {
   .name = "wifiStart",
-  .stack_size = 128 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -200,7 +200,7 @@ int main(void)
 
 #endif /* TERMINAL_USE */
 
-  LOG(("Program starting with RTOS2And a very loooooong line is displayed here.\n"));
+  LOG(("Program starting with RTOS.\n"));
   //wifi_server();
   /* USER CODE END 2 */
 
@@ -225,7 +225,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of wifiStart */
   wifiStartHandle = osThreadNew(wifiStartTask, NULL, &wifiStart_attributes);

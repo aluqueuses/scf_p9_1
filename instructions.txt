@@ -11,3 +11,5 @@ Drivers/BSP/B-L475E-IOT01/{stm34l475e_iot01_tsensor.c,stm32l475e_iot01.c} a Driv
 Drivers/BSP/hts221.c a Drivers/BSP/...
 
 En CubeMX especificar que se usa el firmware V1.17.0 (no el 1.17.1)
+
+incrementar los stack size a 512 y el heap size a 5000
