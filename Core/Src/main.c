@@ -200,7 +200,7 @@ int main(void)
 
 #endif /* TERMINAL_USE */
 
-  LOG(("Program starting with RTOS.\n"));
+  LOG(("Program starting with RTOS2And a very loooooong line is displayed here.\n"));
   //wifi_server();
   /* USER CODE END 2 */
 
@@ -225,7 +225,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of wifiStart */
   wifiStartHandle = osThreadNew(wifiStartTask, NULL, &wifiStart_attributes);
@@ -828,12 +828,13 @@ int wifi_connect(void)
 
 int wifi_get_http(void)
 {
-	int ret,datasent;
-	uint8_t HTTP_REQUEST[]="GET / HTTP/1.0";
+	uint8_t ret,datasent;
+	uint8_t HTTP_REQUEST[]="GET / HTTP/1.0\n\r\n\r";
 	uint8_t ipaddr[4]={193,147,161,245};
 	uint8_t recvdata[1024];
-	int recvlen;
-#define HTTP_PORT 80
+	uint16_t remotePort=80;
+	uint16_t recvlen;
+	uint8_t err=0;
 
 	if (wifi_connect()!=0) return -1;
 
@@ -841,23 +842,35 @@ int wifi_get_http(void)
 
 	//LOG(("My IP address is %d.%d.%d.%d\n",IP_Addr[0],IP_Addr[1],IP_Addr[2],IP_Addr[3]));
 
-	ret=WIFI_OpenClientConnection(SOCKET, WIFI_TCP_PROTOCOL, "http", ipaddr, HTTP_PORT, 1080);
+    ret=WIFI_OpenClientConnection(SOCKET, WIFI_TCP_PROTOCOL, "http", ipaddr, remotePort, 0);
 	if(ret!=WIFI_STATUS_OK) {
 		LOG(("Error in opening connection: %d\n",ret));
-	}
-
-	ret=WIFI_SendData(SOCKET, (uint8_t *)HTTP_REQUEST, strlen((char *)HTTP_REQUEST), &datasent, WIFI_WRITE_TIMEOUT);
-	if(ret!=WIFI_STATUS_OK) {
-		LOG(("Error in sending data: %d\n",ret));
-	}
-
-	ret=WIFI_ReceiveData(SOCKET, recvdata, 1000, &recvlen, 1000);
-	if(ret!=WIFI_STATUS_OK) {
-		LOG(("Error in receiving data: %d\n",ret));
 	} else {
-		LOG(("Received data: %s\n",recvdata));
+		LOG(("Connection established.\n"));
 	}
 
+	while(!err) {
+		ret=WIFI_ReceiveData(SOCKET, recvdata, 1000, &recvlen, WIFI_READ_TIMEOUT);
+		if(ret!=WIFI_STATUS_OK) {
+			LOG(("Error in receiving data: %d\n",ret));
+			err=1;
+		} else {
+			if(recvlen>0) {
+				recvdata[recvlen]=0;
+				LOG(("Received data: %s\n",recvdata));
+			}
+		}
+
+		ret=WIFI_SendData(SOCKET, (uint8_t *)HTTP_REQUEST, strlen((char *)HTTP_REQUEST), &datasent, WIFI_WRITE_TIMEOUT);
+		if(ret!=WIFI_STATUS_OK) {
+			LOG(("Error in sending data: %d\n",ret));
+			err=1;
+		} else {
+			LOG(("Data sent.\n"));
+		}
+
+
+	}
 
 	return 0;
 
