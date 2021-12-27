@@ -1187,7 +1187,7 @@ void StartDefaultTask(void *argument)
 void wifiStartTask(void *argument)
 {
   /* USER CODE BEGIN wifiStartTask */
-  wifi_server();
+  wifi_connect();
 
 	/* Infinite loop */
   for(;;)
