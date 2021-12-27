@@ -27,6 +27,8 @@
 #include "wifi.h"
 #include "stm32l4xx_hal_uart.h"
 #include "stm32l475e_iot01.h"
+#include "stm32l475e_iot01_tsensor.h"
+
 
 /* USER CODE END Includes */
 
@@ -39,13 +41,14 @@ void SPI3_IRQHandler(void);
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define FLAG_LED_ON  0x0001U
+#define FLAG_LED_OFF 0x0002U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 /* Update SSID and PASSWORD with own Access point settings */
-#define SSID     "Redmi Note 9 Pro"
-#define PASSWORD "deadbeef10"
+#include "wifi_passwords.h"
 #define PORT           80
 
 #define TERMINAL_USE
@@ -82,14 +85,21 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for wifiStart */
 osThreadId_t wifiStartHandle;
 const osThreadAttr_t wifiStart_attributes = {
   .name = "wifiStart",
-  .stack_size = 128 * 4,
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for ledTask */
+osThreadId_t ledTaskHandle;
+const osThreadAttr_t ledTask_attributes = {
+  .name = "ledTask",
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -117,6 +127,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 void StartDefaultTask(void *argument);
 void wifiStartTask(void *argument);
+void ledTaskFunc(void *argument);
 
 /* USER CODE BEGIN PFP */
 #if defined (TERMINAL_USE)
@@ -129,11 +140,14 @@ void wifiStartTask(void *argument);
 #endif /* __GNUC__ */
 #endif /* TERMINAL_USE */
 
-static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, uint8_t temperature);
+static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, int16_t temperature);
 static  int wifi_server(void);
 static  int wifi_start(void);
 static  int wifi_connect(void);
 static  bool WebServerProcess(void);
+int wifi_get_http(void);
+int16_t BSP_TSENSOR_ReadIntTemp(void);
+int16_t HTS221_T_ReadIntTemp(uint16_t);
 
 /* USER CODE END PFP */
 
@@ -149,7 +163,7 @@ static  bool WebServerProcess(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	int16_t curtemp;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -196,6 +210,8 @@ int main(void)
   BSP_TSENSOR_Init();
 
   printf("****** WIFI Web Server demonstration****** \n\n");
+  curtemp=HTS221_T_ReadIntTemp(TSENSOR_I2C_ADDRESS);
+  printf("Current temperature is %d\n",curtemp);
 
 #endif /* TERMINAL_USE */
 
@@ -228,6 +244,9 @@ int main(void)
 
   /* creation of wifiStart */
   wifiStartHandle = osThreadNew(wifiStartTask, NULL, &wifiStart_attributes);
+
+  /* creation of ledTask */
+  ledTaskHandle = osThreadNew(ledTaskFunc, NULL, &ledTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -825,6 +844,57 @@ int wifi_connect(void)
   return 0;
 }
 
+int wifi_get_http(void)
+{
+	uint8_t ret;
+	uint16_t datasent;
+	uint8_t HTTP_REQUEST[]="GET / HTTP/1.0\n\r\n\r";
+	uint8_t ipaddr[4]={193,147,161,245};
+	uint8_t recvdata[1024];
+	uint16_t remotePort=80;
+	uint16_t recvlen;
+	uint8_t err=0;
+
+	if (wifi_connect()!=0) return -1;
+
+	LOG(("Running HTTP GET test\n"));
+
+	//LOG(("My IP address is %d.%d.%d.%d\n",IP_Addr[0],IP_Addr[1],IP_Addr[2],IP_Addr[3]));
+
+    ret=WIFI_OpenClientConnection(SOCKET, WIFI_TCP_PROTOCOL, "http", ipaddr, remotePort, 0);
+	if(ret!=WIFI_STATUS_OK) {
+		LOG(("Error in opening connection: %d\n",ret));
+	} else {
+		LOG(("Connection established.\n"));
+	}
+
+	while(!err) {
+		ret=WIFI_ReceiveData(SOCKET, recvdata, 1000, &recvlen, WIFI_READ_TIMEOUT);
+		if(ret!=WIFI_STATUS_OK) {
+			LOG(("Error in receiving data: %d\n",ret));
+			err=1;
+		} else {
+			if(recvlen>0) {
+				recvdata[recvlen]=0;
+				LOG(("Received data: %s\n",recvdata));
+			}
+		}
+
+		ret=WIFI_SendData(SOCKET, (uint8_t *)HTTP_REQUEST, strlen((char *)HTTP_REQUEST), &datasent, WIFI_WRITE_TIMEOUT);
+		if(ret!=WIFI_STATUS_OK) {
+			LOG(("Error in sending data: %d\n",ret));
+			err=1;
+		} else {
+			LOG(("Data sent.\n"));
+		}
+
+
+	}
+
+	return 0;
+
+}
+
 int wifi_server(void)
 {
   bool StopServer = false;
@@ -876,7 +946,7 @@ int wifi_server(void)
 
 static bool WebServerProcess(void)
 {
-  uint8_t temp;
+  int16_t f_temp;
   uint16_t  respLen;
   static   uint8_t resp[1024];
   bool    stopserver=false;
@@ -889,8 +959,9 @@ static bool WebServerProcess(void)
    {
       if(strstr((char *)resp, "GET")) /* GET: put web page */
       {
-        temp = (int) BSP_TSENSOR_ReadTemp();
-        if(SendWebPage(LedState, temp) != WIFI_STATUS_OK)
+        //temp = (int) BSP_TSENSOR_ReadTemp();
+        f_temp = BSP_TSENSOR_ReadIntTemp();
+        if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
         {
           LOG(("> ERROR : Cannot send web page\n"));
         }
@@ -908,14 +979,20 @@ static bool WebServerProcess(void)
            if(strstr((char *)resp, "radio=0"))
            {
              LedState = 0;
-             BSP_LED_Off(LED2);
+             // si no se usan notificaciones, apagar el LED directamente
+             //BSP_LED_Off(LED2);
+             // si se usan notificaciones, enviar notificacion a la tarea
+             osThreadFlagsSet(ledTaskHandle, FLAG_LED_OFF);
            }
            else if(strstr((char *)resp, "radio=1"))
            {
              LedState = 1;
-             BSP_LED_On(LED2);
+             // si no se usan notificaciones, apagar el LED directamente
+             //BSP_LED_On(LED2);
+             // si se usan notificaciones, enviar notificacion a la tarea
+             osThreadFlagsSet(ledTaskHandle, FLAG_LED_ON);
            }
-           temp = (int) BSP_TSENSOR_ReadTemp();
+           f_temp = BSP_TSENSOR_ReadIntTemp();
          }
          if(strstr((char *)resp, "stop_server"))
          {
@@ -928,8 +1005,8 @@ static bool WebServerProcess(void)
              stopserver = true;
            }
          }
-         temp = (int) BSP_TSENSOR_ReadTemp();
-         if(SendWebPage(LedState, temp) != WIFI_STATUS_OK)
+         f_temp = BSP_TSENSOR_ReadIntTemp();
+         if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
          {
            LOG(("> ERROR : Cannot send web page\n"));
          }
@@ -953,7 +1030,7 @@ static bool WebServerProcess(void)
   * @param  None
   * @retval None
   */
-static WIFI_Status_t SendWebPage(uint8_t ledIsOn, uint8_t temperature)
+static WIFI_Status_t SendWebPage(uint8_t ledIsOn, int16_t temperature)
 {
   uint8_t  temp[50];
   uint16_t SentDataLength;
@@ -1043,6 +1120,40 @@ void SPI3_IRQHandler(void)
   HAL_SPI_IRQHandler(&hspi);
 }
 
+int16_t BSP_TSENSOR_ReadIntTemp(void)
+{
+  return HTS221_T_ReadIntTemp(TSENSOR_I2C_ADDRESS);
+}
+
+
+int16_t HTS221_T_ReadIntTemp(uint16_t DeviceAddr)
+{
+  int16_t T0_out, T1_out, T_out, T0_degC_x8_u16, T1_degC_x8_u16;
+  int16_t T0_degC, T1_degC;
+  uint8_t buffer[4], tmp;
+  int16_t tmp_f;
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_T0_DEGC_X8 | 0x80), buffer, 2);
+  tmp = SENSOR_IO_Read(DeviceAddr, HTS221_T0_T1_DEGC_H2);
+
+  T0_degC_x8_u16 = (((uint16_t)(tmp & 0x03)) << 8) | ((uint16_t)buffer[0]);
+  T1_degC_x8_u16 = (((uint16_t)(tmp & 0x0C)) << 6) | ((uint16_t)buffer[1]);
+  T0_degC = T0_degC_x8_u16 >> 3;
+  T1_degC = T1_degC_x8_u16 >> 3;
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_T0_OUT_L | 0x80), buffer, 4);
+
+  T0_out = (((uint16_t)buffer[1]) << 8) | (uint16_t)buffer[0];
+  T1_out = (((uint16_t)buffer[3]) << 8) | (uint16_t)buffer[2];
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_TEMP_OUT_L_REG | 0x80), buffer, 2);
+
+  T_out = (((uint16_t)buffer[1]) << 8) | (uint16_t)buffer[0];
+
+  tmp_f = (T_out - T0_out) * (T1_degC - T0_degC) / (T1_out - T0_out)  +  T0_degC;
+
+  return tmp_f;
+}
 
 /* USER CODE END 4 */
 
@@ -1059,7 +1170,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_14);
+	//HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_14);
 	HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_5);
     osDelay(1000);
   }
@@ -1076,7 +1187,7 @@ void StartDefaultTask(void *argument)
 void wifiStartTask(void *argument)
 {
   /* USER CODE BEGIN wifiStartTask */
-  wifi_server();
+  wifi_connect();
 
 	/* Infinite loop */
   for(;;)
@@ -1084,6 +1195,31 @@ void wifiStartTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END wifiStartTask */
+}
+
+/* USER CODE BEGIN Header_ledTaskFunc */
+/**
+* @brief Function implementing the ledTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ledTaskFunc */
+void ledTaskFunc(void *argument)
+{
+  /* USER CODE BEGIN ledTaskFunc */
+  uint32_t return_wait=0U;
+  /* Infinite loop */
+  for(;;)
+  {
+    // esperar notificaciones
+	  return_wait = osThreadFlagsWait(0x00000003U, osFlagsWaitAny, pdMS_TO_TICKS(1000));
+	  if(return_wait == FLAG_LED_ON)
+	    BSP_LED_On(LED2);
+	  else if(return_wait == FLAG_LED_OFF)
+	    BSP_LED_Off(LED2);
+	  //osDelay(1);
+  }
+  /* USER CODE END ledTaskFunc */
 }
 
 /**
@@ -1139,4 +1275,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

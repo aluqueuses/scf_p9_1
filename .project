@@ -33,17 +33,17 @@
 		<link>
 			<name>BSP/hts221.c</name>
 			<type>1</type>
-			<locationURI>copy_PARENT/Drivers/BSP/Components/hts221/hts221.c</locationURI>
+			<location>/home/aluque/STM32Cube/Repository/STM32Cube_FW_L4_V1.17.1/Drivers/BSP/Components/hts221/hts221.c</location>
 		</link>
 		<link>
 			<name>BSP/B-L475E-IOT01/stm32l475e_iot01.c</name>
 			<type>1</type>
-			<locationURI>copy_PARENT/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01.c</locationURI>
+			<location>/home/aluque/STM32Cube/Repository/STM32Cube_FW_L4_V1.17.1/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01.c</location>
 		</link>
 		<link>
 			<name>BSP/B-L475E-IOT01/stm32l475e_iot01_tsensor.c</name>
 			<type>1</type>
-			<locationURI>copy_PARENT/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_tsensor.c</locationURI>
+			<location>/home/aluque/STM32Cube/Repository/STM32Cube_FW_L4_V1.17.1/Drivers/BSP/B-L475E-IOT01/stm32l475e_iot01_tsensor.c</location>
 		</link>
 		<link>
 			<name>Drivers/BSP/hts221.c</name>

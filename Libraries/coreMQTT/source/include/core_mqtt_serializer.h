@@ -44,9 +44,9 @@
 
 /* Include config defaults header to get default values of configs not
  * defined in core_mqtt_config.h file. */
-#include "../../coreMQTT/include/core_mqtt_config_defaults.h"
+#include "core_mqtt_config_defaults.h"
 
-#include "../../coreMQTT/interface/transport_interface.h"
+#include "transport_interface.h"
 
 /* MQTT packet types. */
 

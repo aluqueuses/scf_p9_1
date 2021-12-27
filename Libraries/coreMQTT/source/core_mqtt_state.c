@@ -24,10 +24,9 @@
  * @file core_mqtt_state.c
  * @brief Implements the functions in core_mqtt_state.h.
  */
-#include "../coreMQTT/include/core_mqtt_state.h"
-
 #include <assert.h>
 #include <string.h>
+#include "core_mqtt_state.h"
 
 /*-----------------------------------------------------------*/
 
