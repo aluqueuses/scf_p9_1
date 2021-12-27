@@ -27,6 +27,8 @@
 #include "wifi.h"
 #include "stm32l4xx_hal_uart.h"
 #include "stm32l475e_iot01.h"
+#include "../Components/hts221/hts221.h"
+int HTS221_T_ReadIntTemp(uint16_t);
 
 /* USER CODE END Includes */
 
@@ -128,7 +130,7 @@ void wifiStartTask(void *argument);
 #endif /* __GNUC__ */
 #endif /* TERMINAL_USE */
 
-static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, uint8_t temperature);
+static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, double temperature);
 static  int wifi_server(void);
 static  int wifi_start(void);
 static  int wifi_connect(void);
@@ -149,7 +151,7 @@ int wifi_get_http(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	int16_t curtemp;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -196,6 +198,9 @@ int main(void)
   BSP_TSENSOR_Init();
 
   printf("****** WIFI Web Server demonstration****** \n\n");
+  curtemp=HTS221_T_ReadIntTemp(TSENSOR_I2C_ADDRESS);
+  //curtemp=27.5;
+  printf("Current temperature is %d\n",curtemp);
 
 #endif /* TERMINAL_USE */
 
@@ -926,6 +931,7 @@ int wifi_server(void)
 
 static bool WebServerProcess(void)
 {
+  double f_temp;
   uint8_t temp;
   uint16_t  respLen;
   static   uint8_t resp[1024];
@@ -939,8 +945,9 @@ static bool WebServerProcess(void)
    {
       if(strstr((char *)resp, "GET")) /* GET: put web page */
       {
-        temp = (int) BSP_TSENSOR_ReadTemp();
-        if(SendWebPage(LedState, temp) != WIFI_STATUS_OK)
+        //temp = (int) BSP_TSENSOR_ReadTemp();
+        f_temp = BSP_TSENSOR_ReadTemp();
+        if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
         {
           LOG(("> ERROR : Cannot send web page\n"));
         }
@@ -965,7 +972,7 @@ static bool WebServerProcess(void)
              LedState = 1;
              BSP_LED_On(LED2);
            }
-           temp = (int) BSP_TSENSOR_ReadTemp();
+           f_temp = BSP_TSENSOR_ReadTemp();
          }
          if(strstr((char *)resp, "stop_server"))
          {
@@ -978,8 +985,8 @@ static bool WebServerProcess(void)
              stopserver = true;
            }
          }
-         temp = (int) BSP_TSENSOR_ReadTemp();
-         if(SendWebPage(LedState, temp) != WIFI_STATUS_OK)
+         f_temp = BSP_TSENSOR_ReadTemp();
+         if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
          {
            LOG(("> ERROR : Cannot send web page\n"));
          }
@@ -1003,7 +1010,7 @@ static bool WebServerProcess(void)
   * @param  None
   * @retval None
   */
-static WIFI_Status_t SendWebPage(uint8_t ledIsOn, uint8_t temperature)
+static WIFI_Status_t SendWebPage(uint8_t ledIsOn, double temperature)
 {
   uint8_t  temp[50];
   uint16_t SentDataLength;
@@ -1016,7 +1023,7 @@ static WIFI_Status_t SendWebPage(uint8_t ledIsOn, uint8_t temperature)
   strcat((char *)http, (char *)"<h2>InventekSys : Web Server using Es-Wifi with STM32</h2>\r\n");
   strcat((char *)http, (char *)"<br /><hr>\r\n");
   strcat((char *)http, (char *)"<p><form method=\"POST\"><strong>Temp: <input type=\"text\" value=\"");
-  sprintf((char *)temp, "%d", temperature);
+  sprintf((char *)temp, "%f", temperature);
   strcat((char *)http, (char *)temp);
   strcat((char *)http, (char *)"\"> <sup>O</sup>C");
 
@@ -1093,6 +1100,35 @@ void SPI3_IRQHandler(void)
   HAL_SPI_IRQHandler(&hspi);
 }
 
+
+int HTS221_T_ReadIntTemp(uint16_t DeviceAddr)
+{
+  int16_t T0_out, T1_out, T_out, T0_degC_x8_u16, T1_degC_x8_u16;
+  int16_t T0_degC, T1_degC;
+  uint8_t buffer[4], tmp;
+  int16_t tmp_f;
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_T0_DEGC_X8 | 0x80), buffer, 2);
+  tmp = SENSOR_IO_Read(DeviceAddr, HTS221_T0_T1_DEGC_H2);
+
+  T0_degC_x8_u16 = (((uint16_t)(tmp & 0x03)) << 8) | ((uint16_t)buffer[0]);
+  T1_degC_x8_u16 = (((uint16_t)(tmp & 0x0C)) << 6) | ((uint16_t)buffer[1]);
+  T0_degC = T0_degC_x8_u16 >> 3;
+  T1_degC = T1_degC_x8_u16 >> 3;
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_T0_OUT_L | 0x80), buffer, 4);
+
+  T0_out = (((uint16_t)buffer[1]) << 8) | (uint16_t)buffer[0];
+  T1_out = (((uint16_t)buffer[3]) << 8) | (uint16_t)buffer[2];
+
+  SENSOR_IO_ReadMultiple(DeviceAddr, (HTS221_TEMP_OUT_L_REG | 0x80), buffer, 2);
+
+  T_out = (((uint16_t)buffer[1]) << 8) | (uint16_t)buffer[0];
+
+  tmp_f = (T_out - T0_out) * (T1_degC - T0_degC) / (T1_out - T0_out)  +  T0_degC;
+
+  return tmp_f;
+}
 
 /* USER CODE END 4 */
 
