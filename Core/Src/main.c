@@ -27,8 +27,8 @@
 #include "wifi.h"
 #include "stm32l4xx_hal_uart.h"
 #include "stm32l475e_iot01.h"
-#include "../Components/hts221/hts221.h"
-int HTS221_T_ReadIntTemp(uint16_t);
+#include "stm32l475e_iot01_tsensor.h"
+
 
 /* USER CODE END Includes */
 
@@ -118,6 +118,8 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 void StartDefaultTask(void *argument);
 void wifiStartTask(void *argument);
+int HTS221_T_ReadIntTemp(uint16_t);
+int16_t BSP_TSENSOR_ReadIntTemp(void);
 
 /* USER CODE BEGIN PFP */
 #if defined (TERMINAL_USE)
@@ -130,7 +132,7 @@ void wifiStartTask(void *argument);
 #endif /* __GNUC__ */
 #endif /* TERMINAL_USE */
 
-static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, double temperature);
+static  WIFI_Status_t SendWebPage(uint8_t ledIsOn, int16_t temperature);
 static  int wifi_server(void);
 static  int wifi_start(void);
 static  int wifi_connect(void);
@@ -199,7 +201,6 @@ int main(void)
 
   printf("****** WIFI Web Server demonstration****** \n\n");
   curtemp=HTS221_T_ReadIntTemp(TSENSOR_I2C_ADDRESS);
-  //curtemp=27.5;
   printf("Current temperature is %d\n",curtemp);
 
 #endif /* TERMINAL_USE */
@@ -832,7 +833,8 @@ int wifi_connect(void)
 
 int wifi_get_http(void)
 {
-	uint8_t ret,datasent;
+	uint8_t ret;
+	uint16_t datasent;
 	uint8_t HTTP_REQUEST[]="GET / HTTP/1.0\n\r\n\r";
 	uint8_t ipaddr[4]={193,147,161,245};
 	uint8_t recvdata[1024];
@@ -931,8 +933,7 @@ int wifi_server(void)
 
 static bool WebServerProcess(void)
 {
-  double f_temp;
-  uint8_t temp;
+  int16_t f_temp;
   uint16_t  respLen;
   static   uint8_t resp[1024];
   bool    stopserver=false;
@@ -946,7 +947,7 @@ static bool WebServerProcess(void)
       if(strstr((char *)resp, "GET")) /* GET: put web page */
       {
         //temp = (int) BSP_TSENSOR_ReadTemp();
-        f_temp = BSP_TSENSOR_ReadTemp();
+        f_temp = BSP_TSENSOR_ReadIntTemp();
         if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
         {
           LOG(("> ERROR : Cannot send web page\n"));
@@ -972,7 +973,7 @@ static bool WebServerProcess(void)
              LedState = 1;
              BSP_LED_On(LED2);
            }
-           f_temp = BSP_TSENSOR_ReadTemp();
+           f_temp = BSP_TSENSOR_ReadIntTemp();
          }
          if(strstr((char *)resp, "stop_server"))
          {
@@ -985,7 +986,7 @@ static bool WebServerProcess(void)
              stopserver = true;
            }
          }
-         f_temp = BSP_TSENSOR_ReadTemp();
+         f_temp = BSP_TSENSOR_ReadIntTemp();
          if(SendWebPage(LedState, f_temp) != WIFI_STATUS_OK)
          {
            LOG(("> ERROR : Cannot send web page\n"));
@@ -1010,7 +1011,7 @@ static bool WebServerProcess(void)
   * @param  None
   * @retval None
   */
-static WIFI_Status_t SendWebPage(uint8_t ledIsOn, double temperature)
+static WIFI_Status_t SendWebPage(uint8_t ledIsOn, int16_t temperature)
 {
   uint8_t  temp[50];
   uint16_t SentDataLength;
@@ -1023,7 +1024,7 @@ static WIFI_Status_t SendWebPage(uint8_t ledIsOn, double temperature)
   strcat((char *)http, (char *)"<h2>InventekSys : Web Server using Es-Wifi with STM32</h2>\r\n");
   strcat((char *)http, (char *)"<br /><hr>\r\n");
   strcat((char *)http, (char *)"<p><form method=\"POST\"><strong>Temp: <input type=\"text\" value=\"");
-  sprintf((char *)temp, "%f", temperature);
+  sprintf((char *)temp, "%d", temperature);
   strcat((char *)http, (char *)temp);
   strcat((char *)http, (char *)"\"> <sup>O</sup>C");
 
@@ -1098,6 +1099,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void SPI3_IRQHandler(void)
 {
   HAL_SPI_IRQHandler(&hspi);
+}
+
+int16_t BSP_TSENSOR_ReadIntTemp(void)
+{
+  return HTS221_T_ReadIntTemp(TSENSOR_I2C_ADDRESS);
 }
 
 
