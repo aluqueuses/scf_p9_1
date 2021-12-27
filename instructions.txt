@@ -18,4 +18,5 @@ configurar Newlib como reentrante en FreeRTOS
 Project/Properties/Settings/Tool Settings/MCU settings. Check "Use float with printf..."
 
 Crear una función BSP_ReadIntTemp para obtener la temperatura como int16_t y eliminar los problemas con los float
+(ver https://nadler.com/embedded/newlibAndFreeRTOS.html)
 

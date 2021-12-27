@@ -41,6 +41,8 @@ void SPI3_IRQHandler(void);
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define FLAG_LED_ON  0x0001U
+#define FLAG_LED_OFF 0x0002U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -83,7 +85,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 512 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for wifiStart */
@@ -91,6 +93,13 @@ osThreadId_t wifiStartHandle;
 const osThreadAttr_t wifiStart_attributes = {
   .name = "wifiStart",
   .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for ledTask */
+osThreadId_t ledTaskHandle;
+const osThreadAttr_t ledTask_attributes = {
+  .name = "ledTask",
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -118,8 +127,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 void StartDefaultTask(void *argument);
 void wifiStartTask(void *argument);
-int HTS221_T_ReadIntTemp(uint16_t);
-int16_t BSP_TSENSOR_ReadIntTemp(void);
+void ledTaskFunc(void *argument);
 
 /* USER CODE BEGIN PFP */
 #if defined (TERMINAL_USE)
@@ -138,6 +146,8 @@ static  int wifi_start(void);
 static  int wifi_connect(void);
 static  bool WebServerProcess(void);
 int wifi_get_http(void);
+int16_t BSP_TSENSOR_ReadIntTemp(void);
+int16_t HTS221_T_ReadIntTemp(uint16_t);
 
 /* USER CODE END PFP */
 
@@ -234,6 +244,9 @@ int main(void)
 
   /* creation of wifiStart */
   wifiStartHandle = osThreadNew(wifiStartTask, NULL, &wifiStart_attributes);
+
+  /* creation of ledTask */
+  ledTaskHandle = osThreadNew(ledTaskFunc, NULL, &ledTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -966,12 +979,18 @@ static bool WebServerProcess(void)
            if(strstr((char *)resp, "radio=0"))
            {
              LedState = 0;
-             BSP_LED_Off(LED2);
+             // si no se usan notificaciones, apagar el LED directamente
+             //BSP_LED_Off(LED2);
+             // si se usan notificaciones, enviar notificacion a la tarea
+             osThreadFlagsSet(ledTaskHandle, FLAG_LED_OFF);
            }
            else if(strstr((char *)resp, "radio=1"))
            {
              LedState = 1;
-             BSP_LED_On(LED2);
+             // si no se usan notificaciones, apagar el LED directamente
+             //BSP_LED_On(LED2);
+             // si se usan notificaciones, enviar notificacion a la tarea
+             osThreadFlagsSet(ledTaskHandle, FLAG_LED_ON);
            }
            f_temp = BSP_TSENSOR_ReadIntTemp();
          }
@@ -1107,7 +1126,7 @@ int16_t BSP_TSENSOR_ReadIntTemp(void)
 }
 
 
-int HTS221_T_ReadIntTemp(uint16_t DeviceAddr)
+int16_t HTS221_T_ReadIntTemp(uint16_t DeviceAddr)
 {
   int16_t T0_out, T1_out, T_out, T0_degC_x8_u16, T1_degC_x8_u16;
   int16_t T0_degC, T1_degC;
@@ -1176,6 +1195,31 @@ void wifiStartTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END wifiStartTask */
+}
+
+/* USER CODE BEGIN Header_ledTaskFunc */
+/**
+* @brief Function implementing the ledTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ledTaskFunc */
+void ledTaskFunc(void *argument)
+{
+  /* USER CODE BEGIN ledTaskFunc */
+  uint32_t return_wait=0U;
+  /* Infinite loop */
+  for(;;)
+  {
+    // esperar notificaciones
+	  return_wait = osThreadFlagsWait(0x00000003U, osFlagsWaitAny, pdMS_TO_TICKS(1000));
+	  if(return_wait == FLAG_LED_ON)
+	    BSP_LED_On(LED2);
+	  else if(return_wait == FLAG_LED_OFF)
+	    BSP_LED_Off(LED2);
+	  //osDelay(1);
+  }
+  /* USER CODE END ledTaskFunc */
 }
 
 /**
