@@ -44,7 +44,7 @@ void SPI3_IRQHandler(void);
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 /* Update SSID and PASSWORD with own Access point settings */
-#define SSID     "Redmi Note 9 Pro"
+#define SSID     "Redmi Note 9"
 #define PASSWORD "deadbeef10"
 #define PORT           80
 
@@ -1110,7 +1110,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_14);
+	//HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_14);
 	HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_5);
     osDelay(1000);
   }
@@ -1127,7 +1127,7 @@ void StartDefaultTask(void *argument)
 void wifiStartTask(void *argument)
 {
   /* USER CODE BEGIN wifiStartTask */
-  wifi_get_http();
+  wifi_server();
 
 	/* Infinite loop */
   for(;;)
