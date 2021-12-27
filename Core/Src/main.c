@@ -44,8 +44,7 @@ void SPI3_IRQHandler(void);
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 /* Update SSID and PASSWORD with own Access point settings */
-#define SSID     "Redmi Note 9"
-#define PASSWORD "deadbeef10"
+#include "wifi_passwords.h"
 #define PORT           80
 
 #define TERMINAL_USE
